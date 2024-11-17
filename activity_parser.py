@@ -1,6 +1,8 @@
 import requests
-#from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup
 import json
+import time
+from datetime import datetime, timedelta, timezone
 
 class ActivityParser:
     def __init__(self, url):
@@ -13,6 +15,7 @@ class ActivityParser:
         self.name = ''
         self.start_latitude = 0
         self.start_longitude = 0
+        self.total_ascent = 0
         self.parsed = False
 
     def _parse(self):
@@ -78,13 +81,16 @@ class GarminActivityParser(ActivityParser):
         self.name = json_response['activityName']
         self._distance = int(json_response['summaryDTO']['distance'])
         self.duration = int(json_response['summaryDTO']['duration'])
-        self.average_speed = json_response['summaryDTO']['averageSpeed']
+        self.average_speed = json_response['summaryDTO']['averageSpeed'] * 3.78
         self.average_rate = int(json_response['summaryDTO']['averageHR'])
-        self.start_time = json_response['summaryDTO']['startTimeLocal']
+        self.start_time = datetime.fromisoformat(json_response['summaryDTO']['startTimeGMT']).timestamp()
+
         self.start_latitude = json_response['summaryDTO']['startLatitude']
         self.start_longitude = json_response['summaryDTO']['startLongitude']
-        print(auth)
-        print(response)
+        self.total_ascent = json_response['summaryDTO']['elevationGain']
+
+        # print(auth)
+        # print(response)
 
 
 class PolarActivityParser(ActivityParser):
@@ -112,16 +118,55 @@ class PolarActivityParser(ActivityParser):
         self.start_latitude = json_data['mapData']['samples'][0][0]['lat']
         self.start_longitude = json_data['mapData']['samples'][0][0]['lon']
 
+        height_list = data_dictionary['exercises'][0]['durationBasedSamples']['ALTITUDE'][0]
 
+        total_height = 0
+        total_down = 0
+        min_height = 10000
+        max_height = 0
+
+        for i in range(len(height_list) - 1):
+            delta = height_list[i+1][1] - height_list[i][1]
+            if delta > 0:
+                total_height += delta
+            else:
+                total_down += abs(delta)
+
+            if height_list[i][1] > max_height:
+                max_height = height_list[i][1]
+
+            if height_list[i][1] < min_height:
+                min_height = height_list[i][1]
+
+        self.total_ascent = total_height
 
 class SuuntoActivityParser(ActivityParser):
 
     def _parse(self):
-        self._distance = 'suunto'
-        self.duration = 'suunto'
-        self.average_speed = 'suunto'
-        self.start_time = 'suunto'
 
+        response = requests.get(self.url)
+
+        if response.status_code != 200:
+            raise ConnectionError('Ошибка парсинга активности: ' + self.url)
+
+        parsed_html = BeautifulSoup(response.text, "html.parser")
+
+        service_url = self.url.replace('move', 'camera')
+        response = requests.get(service_url)
+
+        if response.status_code != 200:
+            raise ConnectionError('Ошибка парсинга активности: ' + self.url)
+        json_response = response.json()
+
+        self.name = parsed_html.head.title.string
+        self._distance = json_response['workout']['totalDistance']
+        self.duration = json_response['workout']['totalTime']
+        self.average_speed = json_response['workout']['avgSpeed']
+        self.start_time = json_response['workout']['startTime']
+        self.average_rate = json_response['workout']['hrdata']['avg']
+        self.start_latitude = json_response['workout']['startPosition']['y']
+        self.start_longitude = json_response['workout']['startPosition']['x']
+        self.total_ascent = json_response['workout']['totalAscent']
 
 def get_parser(url):
     if url.find('garmin') > 0:
