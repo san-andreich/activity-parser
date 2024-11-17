@@ -7,7 +7,7 @@ app = Flask(__name__)
 def hello_world():
     return "Hello World"
 
-@app.route('/', methods=['POST'])
+@app.route('/activity', methods=['GET'])
 def my_form_post():
     url = request.args['activity-url']
 

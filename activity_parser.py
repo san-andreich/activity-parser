@@ -81,7 +81,7 @@ class GarminActivityParser(ActivityParser):
         self.name = json_response['activityName']
         self._distance = int(json_response['summaryDTO']['distance'])
         self.duration = int(json_response['summaryDTO']['duration'])
-        self.average_speed = json_response['summaryDTO']['averageSpeed'] * 3.78
+        self.average_speed = json_response['summaryDTO']['averageSpeed'] * 3.6
         self.average_rate = int(json_response['summaryDTO']['averageHR'])
         self.start_time = datetime.fromisoformat(json_response['summaryDTO']['startTimeGMT']).timestamp()
 
@@ -161,7 +161,7 @@ class SuuntoActivityParser(ActivityParser):
         self.name = parsed_html.head.title.string
         self._distance = json_response['workout']['totalDistance']
         self.duration = json_response['workout']['totalTime']
-        self.average_speed = json_response['workout']['avgSpeed']
+        self.average_speed = json_response['workout']['avgSpeed'] * 3.6
         self.start_time = json_response['workout']['startTime']
         self.average_rate = json_response['workout']['hrdata']['avg']
         self.start_latitude = json_response['workout']['startPosition']['y']
